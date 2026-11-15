@@ -1,3 +1,9 @@
+> [!NOTE]
+> **Why this fork exists:** This is a personal fork of [SnosMe/awakened-poe-trade](https://github.com/SnosMe/awakened-poe-trade).
+> Upstream often takes a long time to pick up game changes, so mods GGG reworded (e.g. `+#% to Item Rarity`)
+> show up as "Not recognized modifier" for weeks. This fork adds such fixes right away.
+> Missing mod texts can be refreshed from the official trade API with `node renderer/scripts/patch-stats-from-trade-api.mjs`.
+
 # ![Awakener's Orb](https://web.poecdn.com/image/Art/2DItems/Currency/TransferOrb.png) Awakened PoE Trade
 
 [![](https://user-images.githubusercontent.com/4292308/153364874-dde23599-278c-4350-8d86-dadbc4b978b3.svg)](https://somsubhra.github.io/github-release-stats/?username=SnosMe&repository=awakened-poe-trade)
