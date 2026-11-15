@@ -483,6 +483,9 @@ function finalFilterTweaks (ctx: FiltersCreationContext) {
         // hide not Corrupted, Vestigial implicits etc., that were not consumed by pseudo stats
         filter.hidden = 'hide_unique_base_implicit'
         filter.disabled = true
+      } else if (item.category === ItemCategory.Viscera) {
+        // the implicit is what makes a Viscera worth something
+        filter.disabled = false
       }
     } else if (
       filter.tag === FilterTag.Foulborn ||

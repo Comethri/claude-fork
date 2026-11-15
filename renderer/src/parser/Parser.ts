@@ -177,6 +177,20 @@ function normalizeName (item: ParserState) {
   }
 }
 
+// Viscera can have a tier word in front, like "Greater Flaming Furnace",
+// while the trade site only knows "Flaming Furnace"
+function findVisceraByTieredName (name: string): BaseType[] | undefined {
+  let rest = name
+  for (let space = rest.indexOf(' '); space !== -1; space = rest.indexOf(' ')) {
+    rest = rest.slice(space + 1)
+    const info = ITEM_BY_TRANSLATED('ITEM', rest)
+    if (info?.length && info[0].craftable?.category === ItemCategory.Viscera) {
+      return info
+    }
+  }
+  return undefined
+}
+
 function findInDatabase (item: ParserState) {
   let info: BaseType[] | undefined
   if (item.category === ItemCategory.DivinationCard) {
@@ -193,6 +207,9 @@ function findInDatabase (item: ParserState) {
     info = ITEM_BY_TRANSLATED('UNIQUE', item.name)
   } else {
     info = ITEM_BY_TRANSLATED('ITEM', item.baseType ?? item.name)
+    if (!info?.length && !item.baseType) {
+      info = findVisceraByTieredName(item.name)
+    }
   }
   if (!info?.length) {
     return err('item.unknown')
@@ -215,6 +232,10 @@ function findInDatabase (item: ParserState) {
       item.category = ITEM_BY_REF('ITEM',
         item.info.unique.base)![0].craftable!.category
     }
+  }
+  // Viscera (Covens league) have no "Rarity:" line, but carry implicit modifiers
+  if (item.category === ItemCategory.Viscera && item.rarity == null) {
+    item.rarity = ItemRarity.Normal
   }
 }
 
