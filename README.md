@@ -1,5 +1,5 @@
 > [!NOTE]
-> **Why this fork exists:** This is a personal fork of [SnosMe/awakened-poe-trade](https://github.com/SnosMe/awakened-poe-trade).
+> **Why this fork exists:** This is a personal fork, maintained and updated with [Claude](https://claude.com/claude-code), of [SnosMe/awakened-poe-trade](https://github.com/SnosMe/awakened-poe-trade).
 > Upstream often takes a long time to pick up game changes, so mods GGG reworded (e.g. `+#% to Item Rarity`)
 > show up as "Not recognized modifier" for weeks. This fork adds such fixes right away.
 > Missing mod texts can be refreshed from the official trade API with `node renderer/scripts/patch-stats-from-trade-api.mjs`.
