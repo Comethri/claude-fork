@@ -108,7 +108,7 @@ for (const row of changedRows) {
 console.log(`Added ${addedTypes.length} missing mod types to existing stats`)
 
 // --- stats whose trade id is not in the app data at all (e.g. new Viscera implicits) ---
-const NEW_STAT_TYPES = new Set(['implicit'])
+const NEW_STAT_TYPES = new Set(['implicit', 'explicit'])
 const ELEMENT = /\b(?:Fire|Cold|Lightning|Chaos|Physical)\b/g
 /** "Fire Exposure ... Fire Resistance" -> "@ Exposure ... @ Resistance" to find a sibling stat */
 const elementless = (ref) => ref.replace(ELEMENT, '@')
@@ -123,19 +123,26 @@ for (const statOrGroup of rows) {
 /** @type {Map<string, any>} trade id -> new stat */
 const newStats = new Map()
 for (const group of trade.result) {
-  if (!NEW_STAT_TYPES.has(group.id)) continue
+  if (!TRADE_TYPES.has(group.id)) continue
   for (const entry of group.entries) {
     const key = entry.id.slice(entry.id.indexOf('.') + 1)
     if (statsById.has(key) || TRADE_ONLY_SUFFIX.test(entry.text)) continue
+    // other types (fractured, crafted, ...) only extend stats created from NEW_STAT_TYPES
+    if (!NEW_STAT_TYPES.has(group.id) && !newStats.has(key)) continue
     const matcher = toMatcherString(entry.text)
-    if (knownMatchers.has(matcher)) continue
-    knownMatchers.add(matcher)
 
     const existing = newStats.get(key)
     if (existing) {
-      existing.matchers.push({ string: matcher })
+      const typeIds = (existing.trade.ids[group.id] ??= [])
+      if (!typeIds.includes(entry.id)) typeIds.push(entry.id)
+      if (!knownMatchers.has(matcher)) {
+        existing.matchers.push({ string: matcher })
+        knownMatchers.add(matcher)
+      }
       continue
     }
+    if (knownMatchers.has(matcher)) continue
+    knownMatchers.add(matcher)
     newStats.set(key, {
       ref: entry.text,
       better: betterBySibling.get(elementless(entry.text)) ?? 1,
@@ -159,12 +166,66 @@ console.log(`\nAdded ${added.length} matchers to ${changedRows.size} stats in ${
 // --- new league item classes ---
 const tradeItems = await loadTradeData('items')
 const itemsNdjson = fs.readFileSync(ITEMS_PATH, 'utf-8')
-const knownItems = new Set(itemsNdjson.split('\n').filter(Boolean)
-  .map(line => JSON.parse(line))
+const localItems = itemsNdjson.split('\n').filter(line => line.trim()).map(line => JSON.parse(line))
+const knownItems = new Set(localItems
   .filter(item => item.namespace === 'ITEM')
   .map(item => item.refName))
+// "name::base", a unique can exist on several bases
+const knownUniques = new Set(localItems
+  .filter(item => item.namespace === 'UNIQUE')
+  .map(item => `${item.refName}::${item.unique.base}`))
 
 const newItems = []
+// uniques the app doesn't know yet (e.g. new league uniques), only on known base types
+for (const group of tradeItems.result) {
+  for (const entry of group.entries) {
+    if (!entry.name || !entry.flags?.unique || !knownItems.has(entry.type)) continue
+    const key = `${entry.name}::${entry.type}`
+    if (knownUniques.has(key)) continue
+    knownUniques.add(key)
+    newItems.push({
+      name: entry.name,
+      refName: entry.name,
+      namespace: 'UNIQUE',
+      unique: { base: entry.type },
+      icon: ''
+    })
+  }
+}
+const newUniqueCount = newItems.length
+
+// bulk exchange items (e.g. "Cursed Poppet", Soul Cores, Threads)
+const EXCHANGE_GROUPS = {
+  Currency: 'ITEM',
+  Fragments: 'ITEM',
+  DeliriumOrbs: 'ITEM',
+  Oils: 'ITEM',
+  Essences: 'ITEM',
+  EnshroudingCrystals: 'ITEM',
+  Cards: 'DIVINATION_CARD'
+}
+const knownNames = new Set(localItems.map(item => `${item.namespace}::${item.refName}`))
+const knownTradeTags = new Set(localItems.map(item => item.tradeTag).filter(Boolean))
+const tradeStatic = await loadTradeData('static')
+for (const group of tradeStatic.result) {
+  const namespace = EXCHANGE_GROUPS[group.id]
+  if (!namespace) continue
+  for (const entry of group.entries) {
+    if (!entry.text || knownTradeTags.has(entry.id) || knownNames.has(`${namespace}::${entry.text}`)) continue
+    knownTradeTags.add(entry.id)
+    knownNames.add(`${namespace}::${entry.text}`)
+    newItems.push({
+      name: entry.text,
+      refName: entry.text,
+      namespace,
+      tradeTag: entry.id,
+      exchangeable: true,
+      icon: entry.image ? `https://web.poecdn.com${entry.image}` : ''
+    })
+  }
+}
+const newExchangeCount = newItems.length - newUniqueCount
+
 for (const group of tradeItems.result) {
   const category = NEW_ITEM_CLASSES[group.id]
   if (!category) continue
@@ -185,4 +246,4 @@ if (newItems.length) {
   fs.writeFileSync(ITEMS_PATH,
     itemsNdjson.replace(/\r?\n?$/, eol) + newItems.map(item => JSON.stringify(item) + eol).join(''))
 }
-console.log(`Added ${newItems.length} base types to ${path.relative(process.cwd(), ITEMS_PATH)}`)
+console.log(`Added ${newUniqueCount} uniques, ${newExchangeCount} exchange items and ${newItems.length - newUniqueCount - newExchangeCount} base types to ${path.relative(process.cwd(), ITEMS_PATH)}`)
